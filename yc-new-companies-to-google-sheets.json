@@ -130,7 +130,9 @@
           ],
           "schema": []
         },
-        "options": {}
+        "options": {
+          "cellFormat": "RAW"
+        }
       },
       "id": "baaba597-189f-4ebb-a290-ca30c5827605",
       "name": "Google Sheets",

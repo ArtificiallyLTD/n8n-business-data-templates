@@ -124,7 +124,9 @@
           ],
           "schema": []
         },
-        "options": {}
+        "options": {
+          "cellFormat": "RAW"
+        }
       },
       "id": "6423e0ba-027e-4d25-bfe9-78c94f852062",
       "name": "Google Sheets",

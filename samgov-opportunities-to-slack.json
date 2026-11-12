@@ -101,7 +101,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all().map(i => i.json).filter(j => j.noticeId);\nif (!items.length) return [];\nconst lines = items.slice(0, 25).map(j => {\n  const due = j.responseDeadline ? j.responseDeadline.slice(0, 10) : 'n/a';\n  const aside = j.setAside ? ` | ${j.setAside}` : '';\n  return `• <${j.samUrl}|${j.title}>\\n   ${j.noticeType} | ${j.department || ''} | NAICS ${j.naicsCode || '-'}${aside} | due ${due}`;\n});\nconst more = items.length > 25 ? `\\n…and ${items.length - 25} more` : '';\nreturn [{ json: { text: `*${items.length} new SAM.gov opportunities*\\n${lines.join('\\n')}${more}` } }];"
+        "jsCode": "const items = $input.all().map(i => i.json).filter(j => j.noticeId);\nif (!items.length) return [];\nconst esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst link = j => /^https:\\/\\/sam\\.gov\\//.test(j.samUrl || '') ? `<${j.samUrl}|${esc(j.title)}>` : esc(j.title);\nconst lines = items.slice(0, 25).map(j => {\n  const due = j.responseDeadline ? esc(j.responseDeadline.slice(0, 10)) : 'n/a';\n  const aside = j.setAside ? ` | ${esc(j.setAside)}` : '';\n  return `• ${link(j)}\\n   ${esc(j.noticeType)} | ${esc(j.department)} | NAICS ${esc(j.naicsCode || '-')}${aside} | due ${due}`;\n});\nconst more = items.length > 25 ? `\\n…and ${items.length - 25} more` : '';\nreturn [{ json: { text: `*${items.length} new SAM.gov opportunities*\\n${lines.join('\\n')}${more}` } }];"
       },
       "id": "214db58a-7b9a-4c8e-82a1-be36c83e3a37",
       "name": "Build Digest",
