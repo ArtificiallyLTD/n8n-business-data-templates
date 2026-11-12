@@ -1,0 +1,217 @@
+{
+  "name": "Enrich websites in Google Sheets with their tech stack",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Enrich a list of websites with their tech stack\nReads domains from column **domain** of a sheet, detects each site's technologies (CMS, ecommerce, analytics, ads, CRM, email, CDN) and writes them back next to the domain. Good for lead lists: find Shopify stores, HubSpot users or sites without analytics.\n\n**Setup (2 minutes)**\n1. Create a free Apify account and copy your API token (Apify Console > Settings > API & Integrations).\n2. Add an n8n *Header Auth* credential named **Apify API token**: header `Authorization`, value `Bearer YOUR_TOKEN`.\n3. Connect Google Sheets. Tab **Domains** needs a header row with a **domain** column.\n4. Click *Test workflow*. Up to 100 domains per run.\n\nCost: [Website Tech Stack Detector](https://apify.com/artificially/website-tech-stack-detector) charges $0.05 per run plus $15 per 1,000 domains.",
+        "height": 440,
+        "width": 460
+      },
+      "id": "c74d376b-2f91-40ef-93e4-46251175c3d7",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -460
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "b2ce4e00-2f1d-4b33-ad50-b06510c3aefe",
+      "name": "Run manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Domains"
+        },
+        "options": {}
+      },
+      "id": "40d083c9-c56d-4cb7-a1c6-f32702e90b58",
+      "name": "Read Domains",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const domains = [...new Set($input.all().map(i => String(i.json.domain || '').trim()).filter(Boolean))].slice(0, 100);\nreturn [{ json: { websites: domains } }];"
+      },
+      "id": "5432c77a-981f-4602-9a20-a01612625958",
+      "name": "Collect Domains",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/artificially~website-tech-stack-detector/run-sync-get-dataset-items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ websites: $json.websites, maxPagesPerDomain: 2 }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "1368ca91-0cf6-4c05-af51-f44544213208",
+      "name": "Tech Stack Detector",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Apify API token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const join = v => Array.isArray(v) ? v.join(', ') : (v ?? '');\nreturn $input.all().map(({ json: j }) => {\n  const h = j.highlights || {};\n  return { json: {\n    domain: j.input || j.domain,\n    title: j.title,\n    cms: join(h.cms),\n    ecommerce: join(h.ecommerce),\n    analytics: join(h.analytics),\n    advertising: join(h.advertising),\n    crm: join(h.crm),\n    emailProvider: join(h.emailProvider),\n    payment: join(h.payment),\n    hosting: join(h.hosting),\n    cdn: join(h.cdn),\n    allTechnologies: (j.technologies || []).map(t => t.name).join(', '),\n    checkedAt: new Date().toISOString().slice(0, 10),\n  } };\n});"
+      },
+      "id": "0fba27c0-17ba-403f-bbbe-9dd79998e090",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Domains"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "domain"
+          ],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "c19d35af-17ea-4f57-8d8a-468fa8a7b6bd",
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1100,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "Read Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Domains": {
+      "main": [
+        [
+          {
+            "node": "Collect Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Domains": {
+      "main": [
+        [
+          {
+            "node": "Tech Stack Detector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tech Stack Detector": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

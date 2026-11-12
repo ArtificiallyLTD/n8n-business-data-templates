@@ -1,0 +1,196 @@
+{
+  "name": "New SAM.gov contract opportunities to Slack",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## New SAM.gov opportunities to Slack\nEvery weekday morning, posts one Slack message with the federal contract opportunities posted since the last run (the first run includes everything from the last 14 days) that match your NAICS codes and keywords. Nothing is posted when there is nothing new.\n\n**Setup (2 minutes)**\n1. Create a free Apify account and copy your API token (Apify Console > Settings > API & Integrations).\n2. Add an n8n *Header Auth* credential named **Apify API token**: header `Authorization`, value `Bearer YOUR_TOKEN`.\n3. Connect Slack and pick the channel.\n4. Edit NAICS codes, keywords and set-asides in **Settings**.\n\nCost: [SAM.gov Contract Opportunities Scraper](https://apify.com/artificially/samgov-opportunities-scraper) charges $0.25 per run plus $2.25 per 1,000 notices (about $6 a month on weekdays); no SAM.gov API key needed.",
+        "height": 420,
+        "width": 460
+      },
+      "id": "472b1c08-2118-4dbb-8b75-dade09aacb69",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -440
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "3ee0737c-e371-49f5-9ed3-2a89a336e399",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6e3f3c2f-b974-41e9-9cd5-3bc563c1d05e",
+              "name": "naicsCodes",
+              "value": "541512, 541519",
+              "type": "string"
+            },
+            {
+              "id": "e512d044-a99b-4144-8460-7096bd9589f3",
+              "name": "keywords",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "d3ed1f07-9650-45de-a88f-5da430322b63",
+              "name": "setAsideTypes",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "65777e93-d4ca-4a61-980c-6e5a99c3411f",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/artificially~samgov-opportunities-scraper/run-sync-get-dataset-items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify(Object.fromEntries(Object.entries({ naicsCodes: $json.naicsCodes.split(',').map(s => s.trim()).filter(Boolean), keywords: $json.keywords || undefined, setAsideTypes: $json.setAsideTypes ? $json.setAsideTypes.split(',').map(s => s.trim()) : undefined, noticeTypes: ['o','k','p','r'], postedWithinDays: 14, openForResponsesOnly: true, onlyNewSinceLastRun: true, includeDescription: false, includeAttachments: false, maxResults: 50 }).filter(([, v]) => v !== undefined && !(Array.isArray(v) && !v.length)))) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "33150abe-8a78-4e55-8eab-94cc5626bd91",
+      "name": "SAM.gov Scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Apify API token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json).filter(j => j.noticeId);\nif (!items.length) return [];\nconst lines = items.slice(0, 25).map(j => {\n  const due = j.responseDeadline ? j.responseDeadline.slice(0, 10) : 'n/a';\n  const aside = j.setAside ? ` | ${j.setAside}` : '';\n  return `• <${j.samUrl}|${j.title}>\\n   ${j.noticeType} | ${j.department || ''} | NAICS ${j.naicsCode || '-'}${aside} | due ${due}`;\n});\nconst more = items.length > 25 ? `\\n…and ${items.length - 25} more` : '';\nreturn [{ json: { text: `*${items.length} new SAM.gov opportunities*\\n${lines.join('\\n')}${more}` } }];"
+      },
+      "id": "214db58a-7b9a-4c8e-82a1-be36c83e3a37",
+      "name": "Build Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#alerts"
+        },
+        "text": "={{ $json.text }}",
+        "otherOptions": {}
+      },
+      "id": "1e634f8a-c324-4d49-84e6-e5b4040d7a43",
+      "name": "Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        0
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "SAM.gov Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SAM.gov Scraper": {
+      "main": [
+        [
+          {
+            "node": "Build Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Digest": {
+      "main": [
+        [
+          {
+            "node": "Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

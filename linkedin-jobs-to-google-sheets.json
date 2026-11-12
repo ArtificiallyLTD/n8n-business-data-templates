@@ -1,0 +1,208 @@
+{
+  "name": "Daily LinkedIn jobs to Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Daily LinkedIn jobs to Google Sheets\nEvery morning, searches LinkedIn for your keywords and location and adds new jobs to a sheet. Rows are matched on `jobId`, so the same job is never added twice.\n\n**Setup (2 minutes)**\n1. Create a free Apify account and copy your API token (Apify Console > Settings > API & Integrations).\n2. Add an n8n *Header Auth* credential named **Apify API token**: header `Authorization`, value `Bearer YOUR_TOKEN`.\n3. Connect Google Sheets, paste your sheet URL, and create a tab named **Jobs**.\n4. Edit the keywords in **Settings**.\n\nCost: [LinkedIn Jobs Scraper](https://apify.com/artificially/linkedin-jobs-scraper) charges $0.25 per run plus $2 per 1,000 jobs (about $10 a month for 50 jobs a day).",
+        "height": 400,
+        "width": 460
+      },
+      "id": "9e9f5ae0-6230-4ef2-8fde-935c32bd7913",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -420
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "1f620796-904c-4ea1-a215-7a0c7e9bb649",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cf62a676-7ce2-473b-8cf6-ad63b0c40468",
+              "name": "searchQueries",
+              "value": "data engineer, product manager",
+              "type": "string"
+            },
+            {
+              "id": "a68f6143-1084-486a-8c59-098062d7bb85",
+              "name": "location",
+              "value": "United States",
+              "type": "string"
+            },
+            {
+              "id": "648b9525-0cf1-4b25-8037-b57b71cda682",
+              "name": "maxJobsPerQuery",
+              "value": 50,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e2b40d09-70cd-4fcd-a8d0-69433fb57a7b",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/artificially~linkedin-jobs-scraper/run-sync-get-dataset-items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ searchQueries: $json.searchQueries.split(',').map(s => s.trim()).filter(Boolean), location: $json.location, maxJobs: $json.maxJobsPerQuery, datePosted: 'past-24h' }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "a6803128-4c81-40f0-a86a-38b6a9cbcb10",
+      "name": "LinkedIn Jobs Scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Apify API token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(({ json: j }) => ({ json: {\n  jobId: j.jobId,\n  title: j.title,\n  company: j.company,\n  location: j.location,\n  posted: j.listingDateParsed || j.listingDate,\n  searchQuery: j.searchQuery,\n  url: j.jobUrl,\n} }));"
+      },
+      "id": "8bd294fa-c2c4-4af8-8ffc-f7157dd2e571",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Jobs"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "7ce4c524-f352-4d1f-8b48-7788f527f48e",
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "LinkedIn Jobs Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn Jobs Scraper": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

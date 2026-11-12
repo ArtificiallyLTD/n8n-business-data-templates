@@ -1,0 +1,199 @@
+{
+  "name": "Competitor hiring tracker: new roles from career sites to Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Competitor hiring tracker\nEvery Monday, checks the career sites of the companies you watch (Greenhouse, Lever, Ashby, Workable, SmartRecruiters and more) and adds new roles to a sheet. The first run adds every current opening; after that only roles posted since the last run. Hiring is the earliest public signal of a new product, market or team.\n\n**Setup (2 minutes)**\n1. Create a free Apify account and copy your API token (Apify Console > Settings > API & Integrations).\n2. Add an n8n *Header Auth* credential named **Apify API token**: header `Authorization`, value `Bearer YOUR_TOKEN`.\n3. Connect Google Sheets and create a tab named **Openings**.\n4. Put the companies' job-board URLs or domains in **Settings**.\n\nCost: [Career Site Jobs Scraper](https://apify.com/artificially/career-site-jobs-scraper) charges $0.05 per run plus $3.15 per 1,000 jobs.",
+        "height": 420,
+        "width": 460
+      },
+      "id": "db315a0e-c2a0-45f2-a80b-0f5396819f83",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -440
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "a4a2b555-7b87-4794-beb7-16b959354810",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "56efd41c-30ba-4a7a-95a4-b00b57073bd0",
+              "name": "companies",
+              "value": "https://job-boards.greenhouse.io/airbnb, https://jobs.lever.co/spotify, notion.so",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a6643235-d508-40cf-b09f-c4b5b8b4c353",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/artificially~career-site-jobs-scraper/run-sync-get-dataset-items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ companies: $json.companies.split(',').map(s => s.trim()).filter(Boolean), onlyNewSinceLastRun: true, includeDescription: false }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "0852c1ea-2abb-4091-9ffe-8b5a12c8adb8",
+      "name": "Career Site Jobs Scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Apify API token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(({ json: j }) => ({ json: {\n  jobId: j.jobId,\n  company: j.company?.name ?? j.company,\n  title: j.title,\n  department: j.department,\n  location: j.location,\n  remote: j.isRemote,\n  posted: j.postedAt,\n  firstSeen: new Date().toISOString().slice(0, 10),\n  url: j.jobUrl || j.applyUrl,\n} }));"
+      },
+      "id": "28c7b29f-7aca-4741-87b1-2bbf869213e6",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Openings"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "6423e0ba-027e-4d25-bfe9-78c94f852062",
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Career Site Jobs Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Career Site Jobs Scraper": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

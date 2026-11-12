@@ -1,0 +1,205 @@
+{
+  "name": "New Y Combinator companies to Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## New Y Combinator companies to Google Sheets\nEvery Monday, adds companies that appeared in the YC directory since the last run (optionally only one industry or only those hiring), with website, one-liner, batch, team size and LinkedIn. Useful for sales prospecting, investing and partnership lists. The first run backfills the 200 most recent companies; after that only new ones are added.\n\n**Setup (2 minutes)**\n1. Create a free Apify account and copy your API token (Apify Console > Settings > API & Integrations).\n2. Add an n8n *Header Auth* credential named **Apify API token**: header `Authorization`, value `Bearer YOUR_TOKEN`.\n3. Connect Google Sheets and create a tab named **YC companies**.\n4. Adjust the filters in **Settings** (leave industry empty for all).\n\nCost: [Y Combinator Scraper](https://apify.com/artificially/ycombinator-scraper) charges $0.05 per run plus $3.15 per 1,000 companies.",
+        "height": 420,
+        "width": 460
+      },
+      "id": "6e3644b3-e30a-4663-af4b-27231d36fcd6",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -440
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "6153a10f-2899-4805-8132-e27931c736ad",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d229d59f-b289-49e1-8ab4-122e760a0272",
+              "name": "industries",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "c62568ca-e49a-4f40-a230-cc8e9a047dd9",
+              "name": "onlyHiring",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "02e6a796-79b6-4fdf-ae49-3f911533b737",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apify.com/v2/acts/artificially~ycombinator-scraper/run-sync-get-dataset-items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify(Object.assign({ onlyNewSinceLastRun: true, includeSocials: true, sortBy: 'launchDate', maxResults: 200 }, $json.industries ? { industries: $json.industries.split(',').map(s => s.trim()).filter(Boolean) } : {}, $json.onlyHiring ? { isHiring: true } : {})) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "c76a295e-818a-4e5a-836f-190e16c12118",
+      "name": "Y Combinator Scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Apify API token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(({ json: j }) => ({ json: {\n  ycId: j.ycId,\n  name: j.name,\n  website: j.website,\n  oneLiner: j.oneLiner,\n  batch: j.batch,\n  industry: j.industry,\n  location: j.location,\n  teamSize: j.teamSize,\n  hiring: j.isHiring,\n  linkedin: j.socials?.linkedin ?? '',\n  ycUrl: j.ycUrl,\n} }));"
+      },
+      "id": "7eb73a52-4669-47b4-b5d8-b99ca3baa3ac",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "YC companies"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "ycId"
+          ],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "baaba597-189f-4ebb-a290-ca30c5827605",
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Y Combinator Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Y Combinator Scraper": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
